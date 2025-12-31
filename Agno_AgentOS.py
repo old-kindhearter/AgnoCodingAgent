@@ -121,5 +121,5 @@ app = agent_os.get_app()
 
 if __name__ == "__main__":
     # 使用该指令启动服务
-    # fastapi dev /workspace/ai-test/AgentPractice/Agno_AgentOS.py
+    # fastapi dev ../AgnoCodingAgent/Agno_AgentOS.py
     agent_os.serve(app="Agno_AgentOS:app", reload=True)
