@@ -196,8 +196,8 @@ class CodeVectorStore(Toolkit):
     def _index_exists(self) -> bool:
         """[内部方法] 检查集合中是否已经有数据"""
         if Path(self.final_path).exists():
-            file_count = sum(1 for item in self.final_path.iterdir() if item.is_file())
-            if file_count == 1:
+            file_count = sum(1 for item in Path(self.final_path).iterdir() if item.is_file())
+            if file_count != 1:
                 print(
                     f"目标路径已存在: {self.final_path}。"
                     f"请删除该目录或选择其他路径。"
