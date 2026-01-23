@@ -7,8 +7,6 @@ from typing import List
 
 # Agno / Phidata imports
 from agno.vectordb.chroma import ChromaDb
-from agno.knowledge.embedder.vllm import VLLMEmbedder
-from agno.knowledge.embedder.jina import JinaEmbedder
 from agno.knowledge.document.base import Document
 
 from agno.tools import Toolkit
@@ -17,14 +15,19 @@ from dotenv import load_dotenv
 # AST Splitting imports
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 
+try:
+    # Try relative import (when used as a module)
+    from .embedder_factory import EmbedderFactory
+except ImportError:
+    # Fall back to absolute import (when run directly)
+    from embedder_factory import EmbedderFactory
+
+
 class CodeVectorStore(Toolkit):
     def __init__(self):
         super().__init__(name="build_vector_base", tools=[self.build_vector_base])
 
         self.vector_db_dir = "../Knowledge/vector_db"  # 直接定死，不要给模型改。建议配置绝对路径。
-
-        self.api_key = os.getenv("JINA_API_KEY")
-        assert self.api_key is not None, "JINA_API_KEY is not set"
 
 
     # 用来统计代码库的语言，以确定分chunk方式。
@@ -116,15 +119,15 @@ class CodeVectorStore(Toolkit):
             total_valid_files = sum(ext_counter.values())
             ratio = count / total_valid_files
             
-            print(f"📊 Language Detection: Main='{self._language.value}' "
+            print(f"Language Detection: Main='{self._language.value}' "
                 f"(Based on {most_common_ext}: {count}/{total_valid_files} files, {ratio:.1%})")
         
         else:
-            print("⚠️ No valid code files found, defaulting to Python.")
+            print("No valid code files found, defaulting to Python.")
             self._language = Language.PYTHON
                 
 
-        print(f"✅ 文件扫描完成，共找到 {len(all_files)} 个有效代码文件。")
+        print(f"文件扫描完成，共找到 {len(all_files)} 个有效代码文件。")
         return all_files
 
     def _load_and_split_ast(self) -> List[Document]:
@@ -132,7 +135,7 @@ class CodeVectorStore(Toolkit):
         files = self._get_files()  # 获取代码文件
         documents = []
         
-        print(f"🔍 Found {len(files)} files. Starting optimized ingestion...")
+        print(f"Found {len(files)} files. Starting optimized ingestion...")
         # 统计数据，用于优化、去重
         total_chunks = 0
         hash_set = set()
@@ -186,9 +189,9 @@ class CodeVectorStore(Toolkit):
             
             except Exception as e:
                 # 生产环境建议用 logging.warning
-                print(f"⚠️ Error processing {file_path}: {e}")
+                print(f"Error processing {file_path}: {e}")
 
-        print(f"✅ AST Split completed. Total vectors generated: {len(documents)}")
+        print(f"AST Split completed. Total vectors generated: {len(documents)}")
         self.vector_db.insert('kek', documents)
 
         return documents
@@ -202,7 +205,8 @@ class CodeVectorStore(Toolkit):
                     f"目标路径已存在: {self.final_path}。"
                     f"请删除该目录或选择其他路径。"
                 )
-                return self.final_path
+                return True  # Path exists, so index exists
+        return False  # Path doesn't exist, so index doesn't exist
         
 
     def build_vector_base(self, repo_path: str) -> str:
@@ -221,31 +225,17 @@ class CodeVectorStore(Toolkit):
 
         self.final_path = os.path.join(self.vector_db_dir, self.repo_name)
 
-        print(f"🚀 Initializing codebase build for: {self.repo_name}")
+        print(f"Initializing codebase build for: {self.repo_name}")
         
         # ====初始化====
-        # 1. 配置 Embedding 模型 (Qwen)
-        # 务必确认 model_id 正确，如果经常下载慢，建议下载到本地后填写本地绝对路径
-        
-        # self.embedder = JinaEmbedder(
-        #     id="jina-embeddings-v3",
-        #     dimensions=1024,
-        #     embedding_type="float",
-        #     late_chunking=True,
-        #     batch_size=50,
-        #     timeout=30.0, 
-        #     api_key=self.api_key
-        # )
-        self.embedder = VLLMEmbedder(
-            id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
-            dimensions=1024, 
-            batch_size=512
-        )
+        # 1. 使用中心化的 Embedder Factory（单例模式，避免重复加载）
+        print("Initializing embedder...")
+        self.embedder = EmbedderFactory.get_embedder()
 
         # 2. 配置 ChromaDB (自动持久化到文件夹)
         # 先检测数据库是否存在
         if self._index_exists():
-            print(f"✅ Knowledge base for '{self.repo_name}' already exists. Skipping build.")
+            print(f"Knowledge base for '{self.repo_name}' already exists. Skipping build.")
             return str(self.final_path)
         
         # ChromaDB 会在 persist_dir 下创建 sqlite3 文件和二进制索引
@@ -258,11 +248,11 @@ class CodeVectorStore(Toolkit):
         self.vector_db.create()
 
         # 2. 生成文档
-        print("⚙️  Parsing and splitting code...")
+        print("Parsing and splitting code...")
         docs = self._load_and_split_ast()
         
         if not docs:
-            print("⚠️ No documents generated. Check your repo path.")
+            print("No documents generated. Check your repo path.")
             return 'No documents generated.'
         return str(self.final_path)
 
@@ -271,7 +261,7 @@ class CodeVectorStore(Toolkit):
 if __name__ == "__main__":
     load_dotenv()
     # 配置
-    TARGET_REPO = "/workspace/ai-test/AgentPractice/Knowledge/codebase/verl" # 替换为你的目标仓库路径
+    TARGET_REPO = "/Users/junwei/Personal/gdiist/AgnoCodingAgent" # 替换为你的目标仓库路径
     
     # 初始化
     # 这一步会自动创建 ./local_knowledge_db 文件夹并在里面生成 chroma.sqlite3
