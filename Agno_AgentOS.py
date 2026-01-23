@@ -108,7 +108,8 @@ LeadArchitect = Team(
         "4. 如果分析师的简报中缺少细节，你可以再次追问 [CodeSearchAgent] 具体的细节。",
         "5. 你的回答必须具备专家级水准，保持简洁，注重代码风格和最佳实践。"
     ],
-    debug_mode=True # 调试模式可以看到中间 Agent 的所有交互
+    # debug_mode=True,  # 调试模式可以看到中间 Agent 的所有交互
+    share_member_interactions=True
 )
 
 agent_os = AgentOS(
