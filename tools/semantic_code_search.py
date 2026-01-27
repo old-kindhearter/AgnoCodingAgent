@@ -25,7 +25,7 @@ class CodeSearch(Toolkit):
             vec_repo_path(str): 要检索本地向量数据库绝对路径
             query(str): 待检索的相关话题
         Returns: 
-            list[str]: 返回字符串数组，其中包含了所有检索结果的代码内容。
+            list[str]: 返回字符串数组,其中包含了所有检索结果的代码内容。
         """
         self.vec_repo_path = os.path.abspath(vec_repo_path)
         self.repo_name = os.path.basename(self.vec_repo_path)
@@ -33,23 +33,31 @@ class CodeSearch(Toolkit):
         print(f"Searching in vector database: {self.repo_name}")
         print(f"Database path: {self.vec_repo_path}")
         
-        # 使用中心化的 Embedder Factory（单例模式，避免重复加载）
+        # 使用中心化的 Embedder Factory
         print("Initializing embedder...")
         self.embedder = EmbedderFactory.get_embedder()
 
         # 初始化 ChromaDB（连接到已存在的数据库）
         self.vector_db = ChromaDb(
             collection=self.repo_name,
-            persistent_client=True,  # 启用持久化客户端
+            persistent_client=True,
             embedder=self.embedder, 
-            path=self.vec_repo_path  # 指定存储路径
+            path=self.vec_repo_path
         )
+        
+        collection_info = self.vector_db.client.get_collection(self.repo_name)
+        doc_count = collection_info.count()
+        print(f"Loaded collection with {doc_count} documents")
+        
+        if doc_count == 0:
+            print("Warning: Collection is empty!")
+            return []
         
         # 初始化 Knowledge 对象用于检索
         self.knowledge = Knowledge(
             name="Github Code Database", 
             vector_db=self.vector_db,
-            max_results=10,  # 最多返回10个结果
+            max_results=10,
         )
 
         print(f"🔎 Query: '{query}'")

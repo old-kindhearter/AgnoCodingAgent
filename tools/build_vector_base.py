@@ -27,7 +27,7 @@ class CodeVectorStore(Toolkit):
     def __init__(self):
         super().__init__(name="build_vector_base", tools=[self.build_vector_base])
 
-        self.vector_db_dir = "../Knowledge/vector_db"  # 直接定死，不要给模型改。建议配置绝对路径。
+        self.vector_db_dir = "../AgnoCodingAgent/Knowledge/vector_db"  # 直接定死，不要给模型改。建议配置绝对路径。
 
 
     # 用来统计代码库的语言，以确定分chunk方式。
@@ -192,7 +192,7 @@ class CodeVectorStore(Toolkit):
                 print(f"Error processing {file_path}: {e}")
 
         print(f"AST Split completed. Total vectors generated: {len(documents)}")
-        self.vector_db.insert('kek', documents)
+        self.vector_db.insert(self.repo_name, documents)
 
         return documents
 
