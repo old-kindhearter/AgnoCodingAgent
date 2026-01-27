@@ -31,10 +31,10 @@ RepoAgent = Agent(
         build_vector_base.CodeVectorStore()
     ],
     description="""
-    你是代码仓库管理员，负责管理本地的两个仓库目录**/workspace/ai-test/AgentPractice/Knowledge/codebase**和**/workspace/ai-test/AgentPractice/Knowledge/vector_db**。
+    你是代码仓库管理员，负责管理本地的两个仓库目录**/AgnoCodingAgent/Knowledge/codebase**和**/AgnoCodingAgent/Knowledge/vector_db**。
     如果需要进行在线搜索，找到对应仓库的github链接，并将仓库clone到第一个目录下；同时将代码转化为向量数据库，保存到第二个目录下，以便后续检索。
     注意：本地目录下新建的仓库，都以github url里包含的原始名字来命名，不要添加任何额外的前缀或后缀，也不要改变原始名字里面的大小写。
-    例如对于**https://github.com/somebody/aaBcD**，应该在本地创建名为**/workspace/ai-test/AgentPractice/Knowledge/codebase/aaBcD**的目录。""",
+    例如对于**https://github.com/somebody/aaBcD**，应该在本地创建名为**/AgnoCodingAgent/Knowledge/codebase/aaBcD**的目录。""",
     instructions=[
         "1. 使用**web_search**工具进行互联网检索，确保找到的仓库是符合用户要求的，得到对应的URL。这个准确的URL给到**clone_github_repo**。"
         "2. 使用**clone_github_repo**工具将在线的gitHub仓库存储于本地，得到该仓库在本地的绝对路径。这个准确的绝对路径给到**build_vector_base**。",

@@ -10,7 +10,7 @@ from typing import Optional
 class GitClone(Toolkit):
     def __init__(self):
         super().__init__(name="clone_github_repo", tools=[self.clone_github_repo])
-        self.target_path = '../AgentPractice/Knowledge/codebase'  # 直接定死，不要给模型改。建议配置绝对路径。
+        self.target_path = '../AgnoCodingAgent/Knowledge/codebase'  # 直接定死，不要给模型改。建议配置绝对路径。
 
     def clone_github_repo(self, github_url: str) -> str:
         """
