@@ -35,11 +35,11 @@ class CodeSearch(Toolkit):
             timeout=30.0, 
             api_key=self.api_key
         )
-        '''self.embedder = VLLMEmbedder(
-            id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
-            dimensions=1024, 
-            batch_size=512
-        )'''
+        # self.embedder = VLLMEmbedder(
+        #     id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
+        #     dimensions=1024, 
+        #     batch_size=512
+        # )
 
         self.vector_db = ChromaDb(
             collection=self.repo_name,

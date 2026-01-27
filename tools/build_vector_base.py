@@ -21,7 +21,7 @@ class CodeVectorStore(Toolkit):
     def __init__(self):
         super().__init__(name="build_vector_base", tools=[self.build_vector_base])
 
-        self.vector_db_dir = "../Knowledge/vector_db"  # 直接定死，不要给模型改。建议配置绝对路径。
+        self.vector_db_dir = "../AgnoCodingAgent/Knowledge/vector_db"  # 直接定死，不要给模型改。建议配置绝对路径。
 
         self.api_key = os.getenv("JINA_API_KEY")
         assert self.api_key is not None, "JINA_API_KEY is not set"
@@ -236,11 +236,11 @@ class CodeVectorStore(Toolkit):
             timeout=30.0, 
             api_key=self.api_key
         )
-        """self.embedder = VLLMEmbedder(
-            id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
-            dimensions=1024, 
-            batch_size=512
-        ) """
+        # self.embedder = VLLMEmbedder(
+        #     id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
+        #     dimensions=1024, 
+        #     batch_size=512
+        # )
 
         # 2. 配置 ChromaDB (自动持久化到文件夹)
         # 先检测数据库是否存在
