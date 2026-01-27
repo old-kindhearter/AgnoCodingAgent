@@ -26,20 +26,20 @@ class CodeSearch(Toolkit):
         self.vec_repo_path = os.path.abspath(vec_repo_path)
         self.repo_name = os.path.basename(self.vec_repo_path)
 
-        # self.embedder = JinaEmbedder(
-        #     id="jina-embeddings-v3",
-        #     dimensions=1024,
-        #     embedding_type="float",
-        #     late_chunking=True,
-        #     batch_size=50,
-        #     timeout=30.0, 
-        #     api_key=self.api_key
-        # )
-        self.embedder = VLLMEmbedder(
+        self.embedder = JinaEmbedder(
+            id="jina-embeddings-v3",
+            dimensions=1024,
+            embedding_type="float",
+            late_chunking=True,
+            batch_size=50,
+            timeout=30.0, 
+            api_key=self.api_key
+        )
+        '''self.embedder = VLLMEmbedder(
             id='Qwen/Qwen3-Embedding-0.6B',  # 建议配置绝对路径。
             dimensions=1024, 
             batch_size=512
-        )
+        )'''
 
         self.vector_db = ChromaDb(
             collection=self.repo_name,

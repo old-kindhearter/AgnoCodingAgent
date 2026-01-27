@@ -1,11 +1,9 @@
 """
 Agno Team API - 带记忆的 Continue 插件集成方案
 
-核心修复：
-1. 使用 db= 参数配合 SqliteDb（而非 storage=）
-2. 使用 add_history_to_context=True（而非 add_history_to_messages）
-3. 使用 num_history_runs=N（而非 num_of_interactions_from_history）
-4. 在 team.run() 中传入 session_id 以实现持久化
+1. 使用 add_history_to_context=True
+2. 使用 num_history_runs=N
+3. 在 team.run() 中传入 session_id 以实现持久化
 
 使用方法：
     uvicorn Agno_api_with_memory:app --host 0.0.0.0 --port 8000 --reload
@@ -25,6 +23,7 @@ from dotenv import load_dotenv
 from agno.agent import Agent
 from agno.team import Team
 from agno.models.deepseek import DeepSeek
+from agno.models.openrouter import OpenRouter
 from agno.db.sqlite import SqliteDb
 
 load_dotenv()
@@ -52,7 +51,7 @@ class agno_team():
         self.RepoAgent = Agent(
             id='repo_agent',
             name="RepoAgent",
-            model=DeepSeek(id="deepseek-chat"),
+            model=OpenRouter(id="deepseek/deepseek-chat"),
             description="""
             你是代码仓库管理员，负责管理本地的两个仓库目录。
             如果需要进行在线搜索，找到对应仓库的github链接，并将仓库clone到本地。""",
