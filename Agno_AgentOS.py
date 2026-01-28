@@ -6,6 +6,8 @@ from agno.models.openrouter import OpenRouter
 from agno.models.deepseek import DeepSeek
 from agno.team import Team
 from agno.os import AgentOS
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,26 +20,32 @@ from tools import semantic_code_search_optimized
 
 load_dotenv()
 
-def warmup_search_engine():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
-    Warmup the search engine at startup.
-    
-    This downloads and loads the embedding model (~500MB on first run).
-    The model is shared across all repositories, so we only need to load it once.
-    ChromaDB connections are made on-demand when users query specific repos.
+    Startup/shutdown event handler.
+    Runs BEFORE the server starts accepting requests.
     """
+    # ===== STARTUP =====
     print("=" * 60)
     print("WARMING UP SEARCH ENGINE")
     print("=" * 60)
     
     try:
-        semantic_code_search_optimized.CodeSearch.warmup()  # No DB path - just load the embedding model
+        # Preload embedding model (500MB, ~5-10 seconds)
+        semantic_code_search_optimized.CodeSearch.warmup()
         print("Search engine ready!")
     except Exception as e:
         print(f"Warmup error: {e}")
-        print("Search engine will initialize on first query.")
+        print("Model will load on first query.")
     
     print("=" * 60)
+    
+    yield  # Server runs here
+    
+    # ===== SHUTDOWN =====
+    print("Shutting down...")
+    semantic_code_search_optimized.CodeSearch.clear_cache()
 
 # ==============================================================================
 # Role 1: Repo search (运维)
@@ -143,9 +151,9 @@ agent_os = AgentOS(
 )
 
 app = agent_os.get_app()
+#app.router.lifespan_context = lifespan
 
 if __name__ == "__main__":
-    warmup_search_engine()
     # 使用该指令启动服务
     # fastapi dev ../AgnoCodingAgent/Agno_AgentOS.py
     agent_os.serve(app="Agno_AgentOS:app", reload=True)
