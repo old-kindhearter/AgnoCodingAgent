@@ -21,6 +21,7 @@ from collections import OrderedDict
 
 import numpy as np
 import chromadb
+import huggingface_hub
 from sentence_transformers import SentenceTransformer
 from agno.tools import Toolkit
 from dotenv import load_dotenv
@@ -46,18 +47,24 @@ class OptimizedEmbedder:
     - Singleton pattern
     - GPU acceleration
     - Batch optimization
+    - Automatic model download
     """
     _instance: Optional['OptimizedEmbedder'] = None
     _lock = threading.Lock()
     
+    # Model configuration
+    DEFAULT_MODEL_ID = "jinaai/jina-embeddings-v2-base-code"
+    
     def __init__(
         self, 
-        model_id: str = "jinaai/jina-embeddings-v2-base-code",
+        model_id: str = DEFAULT_MODEL_ID,
         use_fp16: bool = True,
         max_seq_length: int = 512
     ):
-        print(f"Loading embedding model: {model_id}")
         start = time.perf_counter()
+        
+        # Check if model needs to be downloaded
+        self._ensure_model_downloaded(model_id)
         
         # Detect device
         import torch
@@ -72,6 +79,7 @@ class OptimizedEmbedder:
             print(f"   Using CPU")
         
         # Load model
+        print(f"Loading model into memory...")
         self.model = SentenceTransformer(model_id, device=self.device)
         self.model.max_seq_length = max_seq_length
         
@@ -81,12 +89,46 @@ class OptimizedEmbedder:
             print(f"   FP16 enabled")
         
         # Warmup (compiles kernels, allocates memory)
+        print("Compiling and warming up...")
         _ = self.model.encode("warmup query", normalize_embeddings=True)
         
         elapsed = time.perf_counter() - start
         print(f"Embedder ready in {elapsed:.2f}s")
         
         self._optimal_batch_size = self._find_optimal_batch_size()
+    
+    def _ensure_model_downloaded(self, model_id: str):
+        """
+        Check if model exists locally, download if not.
+        This makes the download step explicit and provides progress feedback.
+        """
+        from pathlib import Path
+        import huggingface_hub
+        
+        # Check HuggingFace cache for the model
+        cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+        model_cache_name = "models--" + model_id.replace("/", "--")
+        model_path = cache_dir / model_cache_name
+        
+        if model_path.exists():
+            print(f"Model found in cache: {model_id}")
+        else:
+            print(f"Downloading model: {model_id}")
+            print(f"   This may take a few minutes on first run (~500MB)...")
+            print(f"   Cache location: {cache_dir}")
+            
+            # Pre-download the model files
+            try:
+                huggingface_hub.snapshot_download(
+                    repo_id=model_id,
+                    repo_type="model",
+                    local_dir_use_symlinks=True
+                )
+                print(f"   Download complete!")
+            except Exception as e:
+                # If pre-download fails, SentenceTransformer will handle it
+                print(f"   Pre-download skipped: {e}")
+                print(f"   Model will download during initialization...")
     
     def _find_optimal_batch_size(self) -> int:
         """Find optimal batch size for current hardware"""
@@ -358,13 +400,35 @@ class CodeSearch(Toolkit):
         return results
     
     @staticmethod
-    def warmup(vec_repo_path: str):
-        """Warmup embedder and DB connection"""
-        print("Warming up...")
+    def warmup(vec_repo_path: Optional[str] = None):
+        """
+        Warmup the search engine. Call this at application startup.
+        
+        This function:
+        1. Downloads the embedding model if not cached (~500MB, first run only)
+        2. Loads the model into GPU/CPU memory
+        3. Compiles GPU kernels (for CUDA/MPS)
+        4. Optionally connects to a ChromaDB collection
+        
+        Args:
+            vec_repo_path: Optional path to a vector database to preload.
+                          If None, only the embedding model is loaded.
+        """
+        print("Warming up search engine...")
+        print("=" * 50)
         start = time.perf_counter()
+        
+        # Step 1: Initialize embedder (downloads model if needed)
+        print("[1/1] Initializing embedding model...")
         OptimizedEmbedder.get_instance()
-        ChromaDBPool.get_collection(vec_repo_path)
-        print(f"Warmup done in {time.perf_counter()-start:.2f}s")
+        
+        # Step 2: Optionally connect to ChromaDB
+        if vec_repo_path:
+            print("[2/2] Connecting to vector database...")
+            ChromaDBPool.get_collection(vec_repo_path)
+        
+        print("=" * 50)
+        print(f"Warmup complete in {time.perf_counter()-start:.2f}s")
     
     @staticmethod
     def clear_cache():
