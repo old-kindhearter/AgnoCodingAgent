@@ -261,7 +261,7 @@ class CodeVectorStore(Toolkit):
 if __name__ == "__main__":
     load_dotenv()
     # 配置
-    TARGET_REPO = "/Users/junwei/Personal/gdiist/AgnoCodingAgent" # 替换为你的目标仓库路径
+    TARGET_REPO = "../AgnoCodingAgent/Knowledge/codebase/AgnoCodingAgen" # 替换为你的目标仓库路径
     
     # 初始化
     # 这一步会自动创建 ./local_knowledge_db 文件夹并在里面生成 chroma.sqlite3

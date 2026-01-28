@@ -103,11 +103,11 @@ if __name__ == "__main__":
     # 测试示例
     try:
         # 示例 1: 克隆一个公开仓库
-        repo_url = "https://github.com/huggingface/trl"
-        target = "/workspace/ai-test/AgentPractice/Knowledge/codebase"
+        repo_url = "https://github.com/old-kindhearter/AgnoCodingAgent"
+        target = "../AgnoCodingAgent/Knowledge/vector_db/AgnoCodingAgent"
         
-        local_path = search.clone_github_repo(repo_url, target)
+        local_path = search.clone_github_repo(repo_url)
         print(f"\n✅ 仓库已克隆到: {local_path}")
         
     except Exception as e:
-        print(f"\n❌ 错误: {str(e)}")
+        print(f"\n❌ 错误: {str(e)}") 

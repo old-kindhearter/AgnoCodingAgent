@@ -25,6 +25,7 @@ from tools import semantic_code_search
 from tools import clone_github_repo
 from tools import web_search
 from tools import build_vector_base_parallel
+from tools import semantic_code_search_optimized
 
 load_dotenv()
 
@@ -69,7 +70,7 @@ class agno_team():
             id='code_sarch_agent',
             name="CodeSearchAgent",
             model=DeepSeek(id="deepseek-chat"),
-            tools=[semantic_code_search.CodeSearch()],  # 假设这个工具返回 Top-30 的原始结果，包含大量冗余
+            tools=[semantic_code_search_optimized.CodeSearch()],  # 假设这个工具返回 Top-30 的原始结果，包含大量冗余
             description="""
             你是负责搜索与简单审查的初级代码工程师，根据意图在向量数据库中进行语义的代码检索。""",
             instructions=[
