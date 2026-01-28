@@ -21,7 +21,7 @@ class EmbedderFactory:
     _sentence_transformer: Optional[SentenceTransformer] = None
     # Using jinaai's code embedding model - specifically trained for code similarity
     _model_id: str = "jinaai/jina-embeddings-v2-base-code"
-    _dimensions: int = 768
+    _dimensions: int = 1024
     
     @classmethod
     def get_embedder(cls) -> SentenceTransformerEmbedder:

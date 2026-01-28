@@ -24,6 +24,7 @@ from tools import build_vector_base
 from tools import semantic_code_search
 from tools import clone_github_repo
 from tools import web_search
+from tools import build_vector_base_parallel
 
 load_dotenv()
 
@@ -41,7 +42,8 @@ class agno_team():
             tools=[
                 web_search.WebSearcher(),
                 clone_github_repo.GitClone(), 
-                build_vector_base.CodeVectorStore()
+                #build_vector_base.CodeVectorStore()
+                build_vector_base_parallel.ParallelCodeVectorStore()
             ],
             description="""
             你是代码仓库管理员，负责管理本地的两个仓库目录**/workspace/ai-test/AgentPractice/Knowledge/codebase**和**/workspace/ai-test/AgentPractice/Knowledge/vector_db**。

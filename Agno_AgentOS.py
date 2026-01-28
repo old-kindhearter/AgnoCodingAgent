@@ -13,6 +13,7 @@ from tools import build_vector_base
 from tools import semantic_code_search
 from tools import clone_github_repo
 from tools import web_search
+from tools import build_vector_base_parallel
 
 load_dotenv()
 
@@ -28,7 +29,8 @@ RepoAgent = Agent(
     tools=[
         web_search.WebSearcher(),
         clone_github_repo.GitClone(), 
-        build_vector_base.CodeVectorStore()
+        #build_vector_base.CodeVectorStore()
+        build_vector_base_parallel.ParallelCodeVectorStore()
     ],
     description="""
     你是代码仓库管理员，负责管理本地的两个仓库目录**../AgnoCodingAgent/Knowledge/codebase**和**../AgnoCodingAgent/Knowledge/vector_db**。
