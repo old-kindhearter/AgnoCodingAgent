@@ -1,22 +1,3 @@
-"""
-Semantic Code Search V2 - Actually Optimized
-=============================================
-
-Key improvements over the previous "optimized" version:
-1. Removed redundant model download checks
-2. Removed FP16 conversion (causes issues on MPS, minimal benefit)
-3. Lazy warmup - don't block initialization
-4. Simplified caching without excessive locking
-5. Direct ChromaDB queries without unnecessary abstraction
-6. Batch operations only when actually beneficial
-7. Connection reuse without complex pooling
-
-Performance targets:
-- Cold start: < 3s (model already cached)
-- Warm query: < 100ms
-- Cached query: < 5ms
-"""
-
 import os
 import time
 import threading
@@ -38,10 +19,6 @@ warnings.filterwarnings("ignore", message="You should probably TRAIN this model"
 class EmbedderSingleton:
     """
     Minimal singleton for embedding model.
-    Key changes from OptimizedEmbedder:
-    - No FP16 conversion (causes MPS issues)
-    - No blocking warmup in __init__
-    - No redundant download checks
     """
     _instance: Optional['EmbedderSingleton'] = None
     _lock = threading.Lock()
@@ -134,7 +111,6 @@ class ChromaDBConnection:
 
 
 # Simple in-memory cache using functools.lru_cache
-# This is much faster than manual OrderedDict + locks
 @lru_cache(maxsize=256)
 def _cached_search(db_path: str, query: str, max_results: int) -> Tuple[str, ...]:
     """
@@ -160,12 +136,8 @@ def _cached_search(db_path: str, query: str, max_results: int) -> Tuple[str, ...
 
 class CodeSearch(Toolkit):
     """
-    Optimized semantic code search.
-    
-    Key improvements:
-    - Uses functools.lru_cache instead of manual caching
+    - Uses functools.lru_cache
     - Minimal abstraction overhead
-    - No blocking warmup
     - Simple connection reuse
     """
     
@@ -307,7 +279,7 @@ if __name__ == "__main__":
     load_dotenv()
     
     print("=" * 70)
-    print("SEMANTIC CODE SEARCH V2 - BENCHMARK")
+    print("SEMANTIC CODE SEARCH - BENCHMARK")
     print("=" * 70)
     
     # Update this path to your actual vector database
