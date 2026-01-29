@@ -27,12 +27,10 @@ class EmbedderSingleton:
     
     def __init__(self):
         import torch
-        
+         
         # Simple device detection
         if torch.cuda.is_available():
             self.device = "cuda"
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            self.device = "mps"
         else:
             self.device = "cpu"
         
@@ -144,7 +142,7 @@ class CodeSearch(Toolkit):
     def __init__(self):
         super().__init__(name="semantic_code_search", tools=[self.semantic_code_search])
     
-    def semantic_code_search(
+    def semantic_code_search( 
         self, 
         vec_repo_path: str, 
         query: str,
@@ -178,11 +176,7 @@ class CodeSearch(Toolkit):
         queries: List[str],
         max_results: int = 5
     ) -> Dict[str, List[str]]:
-        """
-        Batch search - actually optimized for multiple queries.
         
-        Uses batch embedding which is genuinely faster than individual queries.
-        """
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)
         

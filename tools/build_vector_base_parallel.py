@@ -10,9 +10,14 @@ from dataclasses import dataclass
 from sentence_transformers import SentenceTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from agno.tools import Toolkit
+from tools.semantic_code_search_optimized import EmbedderSingleton
 
 import time
 from contextlib import contextmanager
+import warnings
+
+warnings.filterwarnings("ignore", message="Some weights of BertModel")
+warnings.filterwarnings("ignore", message="You should probably TRAIN")
 
 @contextmanager
 def timer(name: str):
@@ -78,10 +83,8 @@ class ParallelCodeVectorStore(Toolkit):
 
     def _get_model(self) -> SentenceTransformer:
         """Lazy load model (singleton within process)"""
-        if self._model is None:
-            print(f"Loading model: {self.model_id}")
-            self._model = SentenceTransformer(self.model_id)
-        return self._model
+        embedder_singleton = EmbedderSingleton.get()
+        return embedder_singleton.model
 
     def _map_ext_to_lang(self, ext: str) -> Language:
         mapping = {
