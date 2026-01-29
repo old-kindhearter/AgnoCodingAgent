@@ -69,8 +69,8 @@ RepoAgent = Agent(
     例如对于**https://github.com/somebody/aaBcD**，应该在本地创建名为**../AgnoCodingAgent/Knowledge/codebase/aaBcD**的目录。""",
     instructions=[
         "1. 使用**web_search**工具进行互联网检索，确保找到的仓库是符合用户要求的，得到对应的URL。这个准确的URL给到**clone_github_repo**。"
-        "2. 使用**clone_github_repo**工具将在线的gitHub仓库存储于本地，得到该仓库在本地的绝对路径。这个准确的绝对路径给到**build_vector_base**。",
-        "3. 使用**build_vector_base**工具将本地的github仓库转换为向量数据库，得到这个向量数据库在本地的绝对路径。",
+        "2. 使用**clone_github_repo**工具将在线的gitHub仓库存储于本地，得到该仓库在本地的绝对路径。这个准确的绝对路径给到**build_vector_base_parallel**。",
+        "3. 使用**build_vector_base_parallel**工具将本地的github仓库转换为向量数据库，得到这个向量数据库在本地的绝对路径。",
         "4. 将这个向量数据库的绝对路径明确告诉你的同事 [CodeSearchAgent]，确保他知道去哪里做向量检索。"
     ],
     # show_tool_calls=True
