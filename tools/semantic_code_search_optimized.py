@@ -138,7 +138,7 @@ class CodeSearch(Toolkit):
         
         # Get cached resources
         embedder = EmbedderSingleton.get()
-        collection = ChromaDBConnection.get_collection(vec_repo_path)
+        collection,_ = ChromaDBConnection.get_collection(vec_repo_path)
         
         # Encode query
         query_embedding = embedder.encode(query)
