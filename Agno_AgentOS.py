@@ -6,6 +6,8 @@ from agno.models.openrouter import OpenRouter
 from agno.models.deepseek import DeepSeek
 from agno.team import Team
 from agno.os import AgentOS
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -13,8 +15,37 @@ from tools import build_vector_base
 from tools import semantic_code_search
 from tools import clone_github_repo
 from tools import web_search
+from tools import build_vector_base_parallel
+from tools import semantic_code_search_optimized
 
 load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Startup/shutdown event handler.
+    Runs BEFORE the server starts accepting requests.
+    """
+    # ===== STARTUP =====
+    print("=" * 60)
+    print("WARMING UP SEARCH ENGINE")
+    print("=" * 60)
+    
+    try:
+        # Preload embedding model (500MB, ~5-10 seconds)
+        semantic_code_search_optimized.CodeSearch.warmup()
+        print("Search engine ready!")
+    except Exception as e:
+        print(f"Warmup error: {e}")
+        print("Model will load on first query.")
+    
+    print("=" * 60)
+    
+    yield  # Server runs here
+    
+    # ===== SHUTDOWN =====
+    print("Shutting down...")
+    semantic_code_search_optimized.CodeSearch.clear_cache()
 
 # ==============================================================================
 # Role 1: Repo search (运维)
@@ -28,17 +59,18 @@ RepoAgent = Agent(
     tools=[
         web_search.WebSearcher(),
         clone_github_repo.GitClone(), 
-        build_vector_base.CodeVectorStore()
+        #build_vector_base.CodeVectorStore()
+        build_vector_base_parallel.ParallelCodeVectorStore()
     ],
     description="""
-    你是代码仓库管理员，负责管理本地的两个仓库目录**/AgnoCodingAgent/Knowledge/codebase**和**/AgnoCodingAgent/Knowledge/vector_db**。
+    你是代码仓库管理员，负责管理本地的两个仓库目录**../AgnoCodingAgent/Knowledge/codebase**和**../AgnoCodingAgent/Knowledge/vector_db**。
     如果需要进行在线搜索，找到对应仓库的github链接，并将仓库clone到第一个目录下；同时将代码转化为向量数据库，保存到第二个目录下，以便后续检索。
     注意：本地目录下新建的仓库，都以github url里包含的原始名字来命名，不要添加任何额外的前缀或后缀，也不要改变原始名字里面的大小写。
-    例如对于**https://github.com/somebody/aaBcD**，应该在本地创建名为**/AgnoCodingAgent/Knowledge/codebase/aaBcD**的目录。""",
+    例如对于**https://github.com/somebody/aaBcD**，应该在本地创建名为**../AgnoCodingAgent/Knowledge/codebase/aaBcD**的目录。""",
     instructions=[
         "1. 使用**web_search**工具进行互联网检索，确保找到的仓库是符合用户要求的，得到对应的URL。这个准确的URL给到**clone_github_repo**。"
-        "2. 使用**clone_github_repo**工具将在线的gitHub仓库存储于本地，得到该仓库在本地的绝对路径。这个准确的绝对路径给到**build_vector_base**。",
-        "3. 使用**build_vector_base**工具将本地的github仓库转换为向量数据库，得到这个向量数据库在本地的绝对路径。",
+        "2. 使用**clone_github_repo**工具将在线的gitHub仓库存储于本地，得到该仓库在本地的绝对路径。这个准确的绝对路径给到**build_vector_base_parallel**。",
+        "3. 使用**build_vector_base_parallel**工具将本地的github仓库转换为向量数据库，得到这个向量数据库在本地的绝对路径。",
         "4. 将这个向量数据库的绝对路径明确告诉你的同事 [CodeSearchAgent]，确保他知道去哪里做向量检索。"
     ],
     # show_tool_calls=True
@@ -54,7 +86,7 @@ CodeSearchAgent = Agent(
     id='code_sarch_agent',
     name="CodeSearchAgent",
     model=DeepSeek(id="deepseek-chat"),
-    tools=[semantic_code_search.CodeSearch()],  # 假设这个工具返回 Top-30 的原始结果，包含大量冗余
+    tools=[semantic_code_search_optimized.CodeSearch()],  # 假设这个工具返回 Top-30 的原始结果，包含大量冗余
     description="""
     你是负责搜索与简单审查的初级代码工程师，根据意图在向量数据库中进行语义的代码检索。""",
     instructions=[
@@ -119,6 +151,7 @@ agent_os = AgentOS(
 )
 
 app = agent_os.get_app()
+#app.router.lifespan_context = lifespan
 
 if __name__ == "__main__":
     # 使用该指令启动服务

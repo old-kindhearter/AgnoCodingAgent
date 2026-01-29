@@ -18,6 +18,12 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+
+# 引入 Agno 组件
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+
 from dotenv import load_dotenv
 
 from agno.agent import Agent
@@ -28,18 +34,49 @@ from agno.db.sqlite import SqliteDb
 
 load_dotenv()
 
-# =============================================================================
-# 存储配置
-# =============================================================================
+from tools import build_vector_base
+from tools import semantic_code_search
+from tools import clone_github_repo
+from tools import web_search
+from tools import build_vector_base_parallel
+from tools import semantic_code_search_optimized
 
-STORAGE_DB_PATH = os.path.join(os.path.dirname(__file__), "tmp", "team_sessions.db")
-os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
+load_dotenv()
+API_HOST = "0.0.0.0"
+API_PORT = 8000
 
-team_db = SqliteDb(db_file=STORAGE_DB_PATH)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan handler for startup/shutdown events.
+    
+    On startup: Downloads and loads the embedding model.
+    On shutdown: Clears caches.
+    """
+    # Startup
+    print("=" * 60)
+    print("STARTING AGNO API SERVER")
+    print("=" * 60)
+    
+    # Warmup embedding model (no specific DB - that's user-dependent)
+    try:
+        print("Warming up embedding model...")
+        semantic_code_search_optimized.CodeSearch.warmup()  # Just load the model
+        print("Search engine ready!")
+    except Exception as e:
+        print(f"Warmup error: {e}")
+        print("Model will load on first query.")
+    
+    print("=" * 60)
+    print(f"API ready at http://{API_HOST}:{API_PORT}")
+    print("=" * 60)
+    
+    yield  # Server runs here
+    
+    # Shutdown
+    print("Shutting down...")
+    semantic_code_search_optimized.CodeSearch.clear_cache()
 
-# =============================================================================
-# Agent 和 Team 定义
-# =============================================================================
 
 class agno_team():
     def __init__(self):
@@ -51,7 +88,13 @@ class agno_team():
         self.RepoAgent = Agent(
             id='repo_agent',
             name="RepoAgent",
-            model=OpenRouter(id="deepseek/deepseek-chat"),
+            model=DeepSeek(id="deepseek-chat"),
+            tools=[
+                web_search.WebSearcher(),
+                clone_github_repo.GitClone(), 
+                #build_vector_base.CodeVectorStore()
+                build_vector_base_parallel.ParallelCodeVectorStore()
+            ],
             description="""
             你是代码仓库管理员，负责管理本地的两个仓库目录。
             如果需要进行在线搜索，找到对应仓库的github链接，并将仓库clone到本地。""",
@@ -72,6 +115,7 @@ class agno_team():
             id='code_search_agent',
             name="CodeSearchAgent",
             model=DeepSeek(id="deepseek-chat"),
+            tools=[semantic_code_search_optimized.CodeSearch()],  # 假设这个工具返回 Top-30 的原始结果，包含大量冗余
             description="""
             你是负责搜索与简单审查的初级代码工程师，根据意图在向量数据库中进行语义的代码检索。""",
             instructions=[
@@ -122,7 +166,7 @@ class ChatCompletionRequest(BaseModel):
     messages: List[Message]
     stream: bool = False
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # --- 流式响应生成器 ---
 def generate_openai_stream(content_generator):
@@ -206,5 +250,37 @@ async def chat_completions(request: ChatCompletionRequest):
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         }
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    stats = semantic_code_search_optimized.CodeSearch.get_stats()
+    return {
+        "status": "healthy",
+        "search_engine": stats
+    }
+
+@app.post("/warmup")
+async def manual_warmup(db_path: Optional[str] = None):
+    """
+    Manually trigger warmup.
+    
+    Args:
+        db_path: Optional path to a vector database to preload.
+                If not provided, only loads the embedding model.
+    """
+    try:
+        semantic_code_search_optimized.CodeSearch.warmup(db_path)
+        return {"status": "success", "db_path": db_path}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/clear-cache")
+async def clear_cache():
+    """Clear all caches."""
+    semantic_code_search_optimized.CodeSearch.clear_cache()
+    return {"status": "success", "message": "Caches cleared"}
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=API_HOST, port=API_PORT, reload=False)
