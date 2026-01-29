@@ -73,7 +73,6 @@ class EmbedderSingleton:
             show_progress_bar=False
         ).tolist()
 
-
 class ChromaDBConnection:
     """
     Simple ChromaDB connection manager.
@@ -107,31 +106,6 @@ class ChromaDBConnection:
         """Clear all connections"""
         cls._connections.clear()
 
-
-# Simple in-memory cache using functools.lru_cache
-@lru_cache(maxsize=256)
-def _cached_search(db_path: str, query: str, max_results: int) -> Tuple[str, ...]:
-    """
-    Cached search function.
-    Returns tuple (hashable) for lru_cache compatibility.
-    """
-    embedder = EmbedderSingleton.get()
-    collection, _ = ChromaDBConnection.get_collection(db_path)
-    
-    # Encode query
-    query_embedding = embedder.encode(query)
-    
-    # Search
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=max_results,
-        include=["documents"]
-    )
-    
-    documents = results["documents"][0] if results["documents"] else []
-    return tuple(documents)
-
-
 class CodeSearch(Toolkit):
     """
     - Uses functools.lru_cache
@@ -162,13 +136,26 @@ class CodeSearch(Toolkit):
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)
         
-        # Use cached search
-        results = _cached_search(vec_repo_path, query, max_results)
+        # Get cached resources
+        embedder = EmbedderSingleton.get()
+        collection = ChromaDBConnection.get_collection(vec_repo_path)
+        
+        # Encode query
+        query_embedding = embedder.encode(query)
+        
+        # Search
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=max_results,
+            include=["documents"]
+        )
+        
+        documents = results["documents"][0] if results["documents"] else []
         
         elapsed = (time.perf_counter() - start) * 1000
-        print(f"Search: {len(results)} results in {elapsed:.1f}ms")
+        print(f"Search: {len(documents)} results in {elapsed:.1f}ms")
         
-        return list(results)
+        return documents
     
     def search_batch(
         self,
@@ -184,46 +171,31 @@ class CodeSearch(Toolkit):
         results = {}
         uncached_queries = []
         uncached_indices = []
-        
-        for i, query in enumerate(queries):
-            cache_key = (vec_repo_path, query, max_results)
-            # Check if in lru_cache (this is a hack but works)
-            try:
-                cached = _cached_search.cache_info()
-                # Try to get from cache without calling
-                result = _cached_search.__wrapped__(vec_repo_path, query, max_results)
-                results[query] = list(result)
-            except:
-                uncached_queries.append(query)
-                uncached_indices.append(i)
-        
-        if uncached_queries:
-            # Get resources
-            embedder = EmbedderSingleton.get()
-            collection, _ = ChromaDBConnection.get_collection(vec_repo_path)
             
-            # Batch embed - this IS faster than individual encoding
-            embed_start = time.perf_counter()
-            embeddings = embedder.encode_batch(uncached_queries)
-            embed_time = (time.perf_counter() - embed_start) * 1000
+        # Get resources
+        embedder = EmbedderSingleton.get()
+        collection, _ = ChromaDBConnection.get_collection(vec_repo_path)
             
-            # Batch search
-            search_start = time.perf_counter()
-            raw_results = collection.query(
-                query_embeddings=embeddings,
-                n_results=max_results,
-                include=["documents"]
-            )
-            search_time = (time.perf_counter() - search_start) * 1000
+        # Batch embed - this IS faster than individual encoding
+        embed_start = time.perf_counter()
+        embeddings = embedder.encode_batch(uncached_queries)
+        embed_time = (time.perf_counter() - embed_start) * 1000
             
-            # Process results
-            for i, query in enumerate(uncached_queries):
-                docs = raw_results["documents"][i] if raw_results["documents"] else []
-                results[query] = docs
-                # Manually populate cache
-                _cached_search.cache_clear()  # Clear to avoid stale entries
+        # Batch search
+        search_start = time.perf_counter()
+        raw_results = collection.query(
+            query_embeddings=embeddings,
+            n_results=max_results,
+            include=["documents"]
+        )
+        search_time = (time.perf_counter() - search_start) * 1000
             
-            print(f"Batch: {len(uncached_queries)} queries, embed={embed_time:.1f}ms, search={search_time:.1f}ms")
+        # Process results
+        for i, query in enumerate(uncached_queries):
+            docs = raw_results["documents"][i] if raw_results["documents"] else []
+            results[query] = docs
+            
+        print(f"Batch: {len(uncached_queries)} queries, embed={embed_time:.1f}ms, search={search_time:.1f}ms")
         
         total = (time.perf_counter() - start) * 1000
         print(f"Total batch: {total:.1f}ms for {len(queries)} queries")
@@ -253,98 +225,5 @@ class CodeSearch(Toolkit):
     @staticmethod
     def clear_cache():
         """Clear all caches"""
-        _cached_search.cache_clear()
         ChromaDBConnection.clear()
         print("Caches cleared")
-    
-    @staticmethod
-    def get_stats() -> Dict:
-        """Get cache statistics"""
-        cache_info = _cached_search.cache_info()
-        return {
-            "cache_hits": cache_info.hits,
-            "cache_misses": cache_info.misses,
-            "cache_size": cache_info.currsize,
-            "cache_maxsize": cache_info.maxsize,
-        }
-
-
-if __name__ == "__main__":
-    load_dotenv()
-    
-    print("=" * 70)
-    print("SEMANTIC CODE SEARCH - BENCHMARK")
-    print("=" * 70)
-    
-    # Update this path to your actual vector database
-    vec_db_path = '../AgnoCodingAgent/Knowledge/vector_db/AgnoCodingAgen'
-    vec_db_path = os.path.abspath(vec_db_path)
-    
-    if not os.path.exists(vec_db_path):
-        print(f"Database not found: {vec_db_path}")
-        print("Please update the path to an existing vector database.")
-        exit(1)
-    
-    searcher = CodeSearch()
-    
-    queries = [
-        "embedder factory singleton pattern",
-        "how to build vector database",
-        "chromadb integration",
-        "sentence transformer embedding",
-        "parallel processing code",
-    ]
-    
-    # Test 1: Cold start
-    print("\n" + "=" * 70)
-    print("TEST 1: Cold Start")
-    print("=" * 70)
-    start = time.perf_counter()
-    results = searcher.semantic_code_search(vec_db_path, queries[0])
-    cold_time = (time.perf_counter() - start) * 1000
-    print(f"Cold start: {cold_time:.1f}ms, {len(results)} results")
-    
-    # Test 2: Warm queries
-    print("\n" + "=" * 70)
-    print("TEST 2: Warm Queries (model loaded)")
-    print("=" * 70)
-    for q in queries[1:3]:
-        start = time.perf_counter()
-        results = searcher.semantic_code_search(vec_db_path, q)
-        warm_time = (time.perf_counter() - start) * 1000
-        print(f"Warm query: {warm_time:.1f}ms")
-    
-    # Test 3: Cached query
-    print("\n" + "=" * 70)
-    print("TEST 3: Cached Query (same query repeated)")
-    print("=" * 70)
-    start = time.perf_counter()
-    results = searcher.semantic_code_search(vec_db_path, queries[0])
-    cached_time = (time.perf_counter() - start) * 1000
-    print(f"Cached: {cached_time:.1f}ms")
-    
-    # Test 4: Batch search
-    print("\n" + "=" * 70)
-    print("TEST 4: Batch Search (5 queries)")
-    print("=" * 70)
-    CodeSearch.clear_cache()
-    start = time.perf_counter()
-    batch_results = searcher.search_batch(vec_db_path, queries)
-    batch_time = (time.perf_counter() - start) * 1000
-    print(f"Batch total: {batch_time:.1f}ms ({batch_time/len(queries):.1f}ms/query)")
-    
-    # Stats
-    print("\n" + "=" * 70)
-    print("STATISTICS")
-    print("=" * 70)
-    stats = CodeSearch.get_stats()
-    for k, v in stats.items():
-        print(f"  {k}: {v}")
-    
-    print("\n" + "=" * 70)
-    print("COMPARISON SUMMARY")
-    print("=" * 70)
-    print(f"  Cold start:  {cold_time:.1f}ms (includes model loading)")
-    print(f"  Warm query:  ~{warm_time:.1f}ms")
-    print(f"  Cached:      {cached_time:.1f}ms")
-    print(f"  Batch avg:   {batch_time/len(queries):.1f}ms/query")
