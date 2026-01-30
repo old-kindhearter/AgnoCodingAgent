@@ -32,8 +32,6 @@ from agno.models.deepseek import DeepSeek
 from agno.models.openrouter import OpenRouter
 from agno.db.sqlite import SqliteDb
 
-load_dotenv()
-
 from tools import build_vector_base
 from tools import semantic_code_search
 from tools import clone_github_repo
@@ -44,6 +42,11 @@ from tools import semantic_code_search_optimized
 load_dotenv()
 API_HOST = "0.0.0.0"
 API_PORT = 8000
+
+STORAGE_DB_PATH = os.path.join(os.path.dirname(__file__), "tmp", "agno_agentos_sessions.db")
+os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
+
+team_db = SqliteDb(db_file=STORAGE_DB_PATH)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -104,6 +107,7 @@ class agno_team():
                 "3. 使用**build_vector_base**工具将本地的github仓库转换为向量数据库。",
             ],
             add_history_to_context=True,
+            db=team_db,
         )
 
         # ==============================================================================
@@ -125,6 +129,7 @@ class agno_team():
                 "4. **上下文压缩**: 对于长函数，提取其函数签名和文档字符串即可。",
             ],
             add_history_to_context=True,
+            db=team_db,
         )
 
         # ==============================================================================
@@ -250,15 +255,6 @@ async def chat_completions(request: ChatCompletionRequest):
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         }
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    stats = semantic_code_search_optimized.CodeSearch.get_stats()
-    return {
-        "status": "healthy",
-        "search_engine": stats
-    }
-
 @app.post("/warmup")
 async def manual_warmup(db_path: Optional[str] = None):
     """
@@ -274,13 +270,11 @@ async def manual_warmup(db_path: Optional[str] = None):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-
 @app.post("/clear-cache")
 async def clear_cache():
     """Clear all caches."""
     semantic_code_search_optimized.CodeSearch.clear_cache()
     return {"status": "success", "message": "Caches cleared"}
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host=API_HOST, port=API_PORT, reload=False)

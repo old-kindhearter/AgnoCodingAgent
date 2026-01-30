@@ -8,6 +8,7 @@ from agno.team import Team
 from agno.os import AgentOS
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from agno.db.sqlite import SqliteDb
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -19,6 +20,11 @@ from tools import build_vector_base_parallel
 from tools import semantic_code_search_optimized
 
 load_dotenv()
+
+STORAGE_DB_PATH = os.path.join(os.path.dirname(__file__), "tmp", "agno_agentos_sessions.db")
+os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
+
+team_db = SqliteDb(db_file=STORAGE_DB_PATH)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -75,6 +81,7 @@ RepoAgent = Agent(
     ],
     # show_tool_calls=True
     add_history_to_context=True, 
+    db=team_db,
 )
 
 # ==============================================================================
@@ -104,6 +111,7 @@ CodeSearchAgent = Agent(
         "6. 不要试图回答问题，尽可能多收集但只保留最相关片段。你的任务是把搜索到的所有原始代码片段完整交给 [LeadArchitect]。",
     ],
     add_history_to_context=True, 
+    db=team_db,
 )
 
 # ==============================================================================
@@ -126,7 +134,10 @@ LeadArchitect = Team(
         "5. 你的回答必须具备专家级水准，保持简洁，注重代码风格和最佳实践。"
     ],
     # debug_mode=True,  # 调试模式可以看到中间 Agent 的所有交互
-    share_member_interactions=True
+    db=team_db,
+    add_history_to_context=True,
+    num_history_runs=10,
+    share_member_interactions=True,
 )
 
 agent_os = AgentOS(
