@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+import numpy as np
 from typing import List, Dict, Optional, Tuple
 from functools import lru_cache
 from dataclasses import dataclass
@@ -23,7 +24,7 @@ class EmbedderSingleton:
     _instance: Optional['EmbedderSingleton'] = None
     _lock = threading.Lock()
     
-    MODEL_ID = "jinaai/jina-embeddings-v2-base-code"
+    MODEL_ID = "/srv/AgnoCodingAgent/cache/jinaai/jina-embeddings-v2-base-code"
     
     def __init__(self):
         import torch
@@ -114,7 +115,7 @@ class CodeSearch(Toolkit):
     """
     
     def __init__(self):
-        super().__init__(name="semantic_code_search", tools=[self.semantic_code_search])
+        super().__init__(name="semantic_code_search", tools=[self.semantic_code_search, self.semantic_code_batchsearch])
     
     def semantic_code_search( 
         self, 
@@ -123,15 +124,13 @@ class CodeSearch(Toolkit):
         max_results: int = 5
     ) -> List[str]:
         """
-        Search the local vector database for code relevant to the query.
-        
+        检索本地的代码库
         Args:
-            vec_repo_path: Path to vector database
-            query: Search query
-            max_results: Number of results (default 5)
-        
-        Returns:
-            List of matching code snippets
+            vec_repo_path(str): 要检索本地向量数据库绝对路径
+            query(str): 待检索的相关话题
+            max_results: int = 5 检索结果的最大数量
+        Returns: 
+            list[str]: 返回字符串数组,其中包含了所有检索结果的代码内容。
         """
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)
@@ -157,20 +156,26 @@ class CodeSearch(Toolkit):
         
         return documents
     
-    def search_batch(
+    def semantic_code_batchsearch(
         self,
         vec_repo_path: str,
         queries: List[str],
         max_results: int = 5
     ) -> Dict[str, List[str]]:
-        
+        """
+        批量检索本地的代码库
+        Args:
+            vec_repo_path(str): 要检索本地向量数据库绝对路径
+            queries(List[str]): 待检索的相关话题
+            max_results: int = 5 检索结果的最大数量
+        Returns: 
+            Dict[str, List[str]]: 返回包含了所有检索结果的代码内容。
+        """
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)
         
         # Check cache first
         results = {}
-        uncached_queries = []
-        uncached_indices = []
             
         # Get resources
         embedder = EmbedderSingleton.get()
@@ -178,24 +183,24 @@ class CodeSearch(Toolkit):
             
         # Batch embed - this IS faster than individual encoding
         embed_start = time.perf_counter()
-        embeddings = embedder.encode_batch(uncached_queries)
+        embeddings = embedder.encode_batch(queries)
         embed_time = (time.perf_counter() - embed_start) * 1000
             
         # Batch search
         search_start = time.perf_counter()
         raw_results = collection.query(
-            query_embeddings=embeddings,
+            query_embeddings=np.array(embeddings),
             n_results=max_results,
             include=["documents"]
         )
         search_time = (time.perf_counter() - search_start) * 1000
             
         # Process results
-        for i, query in enumerate(uncached_queries):
+        for i, query in enumerate(queries):
             docs = raw_results["documents"][i] if raw_results["documents"] else []
             results[query] = docs
             
-        print(f"Batch: {len(uncached_queries)} queries, embed={embed_time:.1f}ms, search={search_time:.1f}ms")
+        print(f"Batch: {len(queries)} queries, embed={embed_time:.1f}ms, search={search_time:.1f}ms")
         
         total = (time.perf_counter() - start) * 1000
         print(f"Total batch: {total:.1f}ms for {len(queries)} queries")

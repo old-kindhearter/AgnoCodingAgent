@@ -13,7 +13,7 @@ tools: 存放相关工具
     - semantic_code_search.py: 用于检索本地向量数据库中的代码库内容
 ```
 
-Agno_AgentOS.py: webui运行agno的team对话功能。使用```fastapi dev ../Agno_AgentOS.py```启动服务，并在https://os.agno.com/访问
+Agno_AgentOS.py: webui运行agno的team对话功能。使用```fastapi dev /srv/AgnoCodingAgent/Agno_AgentOS.py```启动服务，并在**https://os.agno.com/**访问
 
 Agno_api.py: 使用OpenAI兼容的格式给coding插件提供对话功能
 

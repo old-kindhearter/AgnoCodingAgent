@@ -19,7 +19,7 @@ class WebSearcher(Toolkit):
 
     def web_search(self, query: str, count: int = 5) -> str:
         """
-        使用 Tavily 搜索引擎检索话题相关内容。
+        使用 Tavily 搜索引擎检索话题相关内容。仔细分析query内容，搜索关键词尽量少而精准。
         Args:
             query(str): 待搜索的话题/关键词
             count(int): 搜索结果数量，默认为5
@@ -79,6 +79,6 @@ def web_search(query: str, count: int = 10):
 if __name__ == "__main__":
     load_dotenv()
     
-    search_result = str(web_search("AlignKT github", count=5))
+    search_result = str(web_search("AlignKT", count=5))
     print(type(search_result))
     print(search_result)

@@ -51,6 +51,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+downloadmodel.py
 
 # Translations
 *.mo
@@ -206,3 +207,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local models
+cache/
+srv/AgnoCodingAgent/cache/
+
+# Local Knowledge Base
+Knowledge/
+srv/AgnoCodingAgent/Knowledge/

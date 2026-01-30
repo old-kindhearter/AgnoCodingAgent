@@ -65,19 +65,18 @@ def _process_file_worker(args: Tuple[str, str, Language]) -> List[ChunkData]:
     return chunks
 
 
-class ParallelCodeVectorStore(Toolkit):
+class CodeVectorStore(Toolkit):
     """
     Option 1: Bypass Agno for build, compatible with Agno for search.
     
     - Build: Direct ChromaDB + SentenceTransformers
     - Search: Agno Knowledge reads the same DB
     """
-    
     def __init__(self, num_workers: int = None):
         super().__init__(name="build_vector_base", tools=[self.build_vector_base])
-        self.vector_db_dir = "../AgnoCodingAgent/Knowledge/vector_db"
+        self.vector_db_dir = "/srv/AgnoCodingAgent/Knowledge/vector_db"
         self.num_workers = num_workers or max(1, mp.cpu_count() - 1)
-        self.model_id = "jinaai/jina-embeddings-v2-base-code"
+        self.model_id = "/srv/AgnoCodingAgent/cache/jinaai/jina-embeddings-v2-base-code"
         self._language = Language.PYTHON
         self._model = None  # Lazy load
 
@@ -197,6 +196,13 @@ class ParallelCodeVectorStore(Toolkit):
         print(f"Phase 3 complete")
 
     def build_vector_base(self, repo_path: str) -> str:
+        """
+        按照语法树规则对本地github仓库的代码进行分chunk，并构建向量知识库
+        Args:
+            repo_path(str): 本地github仓库的绝对路径
+        Returns:
+            str: 返回本地github仓库对应的向量化数据库的绝对路径
+        """
         self.repo_path = os.path.abspath(repo_path)
         self.repo_name = os.path.basename(self.repo_path)
         self.final_path = os.path.join(self.vector_db_dir, self.repo_name)
