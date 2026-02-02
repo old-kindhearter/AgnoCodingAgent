@@ -10,7 +10,7 @@ class EmbedderSingleton:
     _instance: Optional['EmbedderSingleton'] = None
     _lock = threading.Lock()
     
-    MODEL_ID = "/srv/AgnoCodingAgent/cache/jinaai/jina-embeddings-v2-base-code"
+    MODEL_ID = "jina-embeddings-v2-base-code"
     
     def __init__(self):
         import torch
