@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from sentence_transformers import SentenceTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from agno.tools import Toolkit
-from embedder_factory import EmbedderSingleton
+from .embedder_factory import EmbedderSingleton
 
 import time
 from contextlib import contextmanager

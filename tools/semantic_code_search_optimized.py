@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple
 import chromadb
 from agno.tools import Toolkit
-from embedder_factory import EmbedderSingleton
+from .embedder_factory import EmbedderSingleton
 
 # Suppress Jina model warnings
 import warnings
@@ -46,12 +46,6 @@ class ChromaDBConnection:
         cls._connections.clear()
 
 class CodeSearch(Toolkit):
-    """
-    - Uses functools.lru_cache
-    - Minimal abstraction overhead
-    - Simple connection reuse
-    """
-    
     def __init__(self):
         super().__init__(name="semantic_code_search", tools=[self.semantic_code_search, self.semantic_code_batchsearch])
     
@@ -170,7 +164,7 @@ class CodeSearch(Toolkit):
     @staticmethod
     def warmup(vec_repo_path: Optional[str] = None):
         """
-        Warmup the search engine.
+        Warmup the search engine. 
         
         Args:
             vec_repo_path: Optional path to preload a specific database
@@ -179,11 +173,7 @@ class CodeSearch(Toolkit):
         start = time.perf_counter()
         
         # Load embedding model
-        EmbedderSingleton.get()
-        
-        # Optionally preload database
-        if vec_repo_path:
-            ChromaDBConnection.get_collection(vec_repo_path)
+        EmbedderSingleton.get() 
         
         print(f"Warmup complete in {time.perf_counter()-start:.2f}s")
     

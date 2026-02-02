@@ -123,7 +123,7 @@ LeadArchitect = Team(
     members=[RepoAgent, CodeSearchAgent],
     model=DeepSeek(id="deepseek-chat"), # Team Leader 依然是主程
     description="""
-    这是一个优化的基于检索增强生成技术的编程团队，通常的工作场景是基于用户指明的某个代码库进行开发工作。你是这个编程团队的主程，负责最终向用户输出解决方案。
+    这是一个优化的基于检索增强生成技术的编程团队，通常的工作场景  是基于用户指明的某个代码库进行开发工作。你是这个编程团队的主程，负责最终向用户输出解决方案。
     你需要先将任务拆解分配给团队成员们，首次对话或者用户提到了需要引入新的代码库进行开发时按照下列流程进行调度：首先让 [RepoAgent] 搜索这个代码库的github url并本地向量化，然后使用 [CodeSearchAgent] 进行语义搜索，再将结果返回给 [LeadArchitect]。
     在完成了前面的代码本地化之后，按照下列流程进行调度：如果 [LeadArchitect] 需要新的内容，让 [CodeSearchAgent] 进行语义搜索，再将结果返回给 [LeadArchitect]。""",
     instructions=[
