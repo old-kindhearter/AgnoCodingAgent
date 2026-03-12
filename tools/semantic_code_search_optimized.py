@@ -1,78 +1,17 @@
 import os
 import time
-import threading
 import numpy as np
 from typing import List, Dict, Optional, Tuple
-from functools import lru_cache
-from dataclasses import dataclass
 
 import chromadb
 from sentence_transformers import SentenceTransformer
 from agno.tools import Toolkit
-from dotenv import load_dotenv
+from tools.embedder_factory import EmbedderSingleton
 
 # Suppress Jina model warnings
 import warnings
 warnings.filterwarnings("ignore", message="Some weights of BertModel were not initialized")
 warnings.filterwarnings("ignore", message="You should probably TRAIN this model")
-
-
-class EmbedderSingleton:
-    """
-    Minimal singleton for embedding model.
-    """
-    _instance: Optional['EmbedderSingleton'] = None
-    _lock = threading.Lock()
-    
-    MODEL_ID = "/srv/AgnoCodingAgent/cache/jinaai/jina-embeddings-v2-base-code"
-    
-    def __init__(self):
-        import torch
-         
-        # Simple device detection
-        if torch.cuda.is_available():
-            self.device = "cuda"
-        else:
-            self.device = "cpu"
-        
-        print(f"Loading embedding model on {self.device}...")
-        start = time.perf_counter()
-        
-        # Load model - SentenceTransformer handles caching internally
-        self.model = SentenceTransformer(self.MODEL_ID, device=self.device)
-        
-        # Set reasonable max length for code
-        self.model.max_seq_length = 512
-        
-        elapsed = time.perf_counter() - start
-        print(f"Model loaded in {elapsed:.2f}s")
-    
-    @classmethod
-    def get(cls) -> 'EmbedderSingleton':
-        """Thread-safe singleton access"""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-    
-    def encode(self, text: str) -> List[float]:
-        """Encode single text"""
-        return self.model.encode(
-            text,
-            normalize_embeddings=True,
-            convert_to_numpy=True
-        ).tolist()
-    
-    def encode_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
-        """Encode multiple texts"""
-        return self.model.encode(
-            texts,
-            batch_size=batch_size,
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-            show_progress_bar=False
-        ).tolist()
 
 class ChromaDBConnection:
     """
@@ -121,16 +60,26 @@ class CodeSearch(Toolkit):
         self, 
         vec_repo_path: str, 
         query: str,
-        max_results: int = 5
+        max_results: int = 2
     ) -> List[str]:
         """
-        检索本地的代码库
+        在本地向量数据库中进行语义代码检索，返回最相关的代码片段。
+        支持自然语言查询和技术概念搜索。
+        
         Args:
-            vec_repo_path(str): 要检索本地向量数据库绝对路径
-            query(str): 待检索的相关话题
-            max_results: int = 5 检索结果的最大数量
-        Returns: 
-            list[str]: 返回字符串数组,其中包含了所有检索结果的代码内容。
+            vec_repo_path(str): 本地向量数据库的绝对路径
+            query(str): 待检索的查询内容，支持自然语言或技术术语
+            max_results(int): 返回的最大结果数量，默认5条，建议范围3-10
+        
+        Returns:
+            list[str]: 返回字符串数组，每个字符串包含：
+                    - 文件路径标注 (// File: path/to/file.py)
+                    - 代码块序号 (// Part: 0)
+                    - 完整的代码内容（尽可能包含完整函数/类）
+        使用建议:
+        - 使用具体的技术术语能获得更好的结果
+        - 适合单一概念的精确查询
+        - 如需搜索3+个相关概念，建议使用 semantic_code_batchsearch
         """
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)
@@ -163,13 +112,25 @@ class CodeSearch(Toolkit):
         max_results: int = 5
     ) -> Dict[str, List[str]]:
         """
-        批量检索本地的代码库
+        批量检索多个相关概念，适合需要同时探索多个方面的场景。
+        
         Args:
-            vec_repo_path(str): 要检索本地向量数据库绝对路径
-            queries(List[str]): 待检索的相关话题
-            max_results: int = 5 检索结果的最大数量
-        Returns: 
-            Dict[str, List[str]]: 返回包含了所有检索结果的代码内容。
+            vec_repo_path(str): 本地向量数据库的绝对路径
+            queries(List[str]): 待检索的查询列表
+                            例如: ["身份认证", "权限控制", "会话管理"]
+            max_results(int): 每个查询返回的最大结果数，默认5条
+        
+        Returns:
+            Dict[str, List[str]]: 字典，键为原始查询，值为对应的代码片段列表
+        
+        使用场景:
+        - 需要同时搜索3个以上相关概念
+        - 从多个角度探索同一功能特性
+        - 用户问题包含多个子话题（如"认证和数据库连接如何工作"）
+        
+        不适用的场景：
+        - 单个查询（用 semantic_code_search 更简单）
+        - 需要根据前一次结果动态调整查询（用 semantic_code_search 迭代）
         """
         start = time.perf_counter()
         vec_repo_path = os.path.abspath(vec_repo_path)

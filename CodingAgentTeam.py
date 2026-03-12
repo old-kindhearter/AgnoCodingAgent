@@ -1,56 +1,36 @@
-import os, sys
-from dotenv import load_dotenv
+import os, sys, uuid, json, time
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 
 from agno.agent import Agent
-from agno.models.openrouter import OpenRouter
 from agno.models.deepseek import DeepSeek
+from agno.agent import Agent
 from agno.team import Team
-from agno.os import AgentOS
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
 from agno.db.sqlite import SqliteDb
+from agno.os import AgentOS
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from tools import find_repo_exist
 from tools import clone_github_repo
 from tools import web_search
 from tools import build_vector_base_parallel
 from tools import semantic_code_search_optimized
+from tools import find_repo_exist
+from agno.skills import Skills, LocalSkills
+
+from dotenv import load_dotenv
+
+
 load_dotenv()
 
+# 创建 Team，启用历史记录
 STORAGE_DB_PATH = os.path.join(os.path.dirname(__file__), "tmp", "agno_agentos_sessions.db")
 os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
 
 team_db = SqliteDb(db_file=STORAGE_DB_PATH)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Startup/shutdown event handler.
-    Runs BEFORE the server starts accepting requests.
-    """
-    # ===== STARTUP =====
-    print("=" * 60)
-    print("WARMING UP SEARCH ENGINE")
-    print("=" * 60)
-    
-    try:
-        # Preload embedding model (500MB, ~5-10 seconds)
-        semantic_code_search_optimized.CodeSearch.warmup()
-        print("Search engine ready!")
-    except Exception as e:
-        print(f"Warmup error: {e}")
-        print("Model will load on first query.")
-    
-    print("=" * 60)
-    
-    yield  # Server runs here
-    
-    # ===== SHUTDOWN =====
-    print("Shutting down...")
-    semantic_code_search_optimized.CodeSearch.clear_cache()
-
+# 创建skill
+skills = Skills(loaders=[LocalSkills("/path/to/skills")])
 
 RepoAgent = Agent(
     id='repo_agent',
@@ -95,7 +75,6 @@ CodeSearchAgent = Agent(
         "4. **相关性过滤**: 判断哪些片段是真正有用的，哪些是噪音（如测试用例、无关的工具函数）。剔除噪音。",
         "5. **上下文压缩**: 对于长函数，如果不是核心逻辑，提取其函数签名（Signature）和文档字符串（Docstring）即可。", 
         "6. **只保留最相关片段**：你的任务是把搜索到的最相关的代码片段完整交给 [LeadArchitect]。",
-        "7. **直接返回搜索结果**：你不需要对代码做任何改动，也不需要做总结或者分析。", 
     ],
 )
 
@@ -125,17 +104,3 @@ LeadArchitect = Team(
     share_member_interactions=True,
     # add_team_history_to_members=True, 
 )
-
-agent_os = AgentOS(
-    id='Coding Agent', 
-    description='a multi-agent system for private coding.',
-    teams=[LeadArchitect]
-)
-
-app = agent_os.get_app()
-#app.router.lifespan_context = lifespan
-
-if __name__ == "__main__":
-    # 使用该指令启动服务
-    # fastapi dev /srv/AgnoCodingAgent/Agno_AgentOS.py
-    agent_os.serve(app="Agno_AgentOS:app", reload=True)

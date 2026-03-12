@@ -1,7 +1,6 @@
-import os
+import os, re
 import subprocess
-import re
-
+from urllib.parse import urlparse
 from agno.tools import Toolkit
 from pathlib import Path
 from typing import Optional
@@ -12,11 +11,41 @@ class GitClone(Toolkit):
         super().__init__(name="clone_github_repo", tools=[self.clone_github_repo])
         self.target_path = '/srv/AgnoCodingAgent/Knowledge/codebase'  # 直接定死，不要给模型改。建议配置绝对路径。
 
+
+    def _convert_github_url(github_url):
+        """
+        将各种GitHub URL格式转换为HTTPS格式
+        """
+        # 处理SSH格式: git@github.com:user/repo.git
+        ssh_pattern = r'git@github\.com:(?P<user>[^/]+)/(?P<repo>[^/.]+)(?:\.git)?'
+        ssh_match = re.match(ssh_pattern, github_url)
+        
+        if ssh_match:
+            return f"https://github.com/{ssh_match.group('user')}/{ssh_match.group('repo')}"
+        
+        # 处理标准URL格式
+        parsed_url = urlparse(github_url)
+        
+        # 如果已经是HTTPS，直接返回
+        if parsed_url.scheme == 'https':
+            return github_url
+        
+        # 处理git://或ssh://scheme
+        if parsed_url.scheme in ['git', 'ssh']:
+            # 移除可能的端口号和.git后缀
+            netloc = parsed_url.netloc.replace(':22', '')  # 移除SSH默认端口
+            path = parsed_url.path.rstrip('.git')
+            return f"https://{netloc}{path}"
+        
+        # 其他情况返回原URL
+        return github_url
+
+
     def clone_github_repo(self, github_url: str) -> str:
         """
         克隆 GitHub 仓库到指定文件夹。如果没有找到本地的文件夹
         Args:
-            github_url: GitHub 仓库的 URL（支持 HTTPS 和 SSH 格式）
+            github_url: GitHub 仓库的 URL，如果是ssh格式则自动转换为HTTPS格式。
             
         Returns:
             str: 该仓库在本地的绝对路径
@@ -25,76 +54,39 @@ class GitClone(Toolkit):
             ValueError: 当输入参数无效时
             RuntimeError: 当克隆操作失败时
         """
+        github_url = self._convert_github_url(github_url)
+
+        parsed_url = urlparse(github_url)
+        path_parts = parsed_url.path.strip("/").split("/")
+        repo_name = path_parts[-1] if path_parts else "repository"
         
-        # 验证 GitHub URL 格式
-        github_patterns = [
-            r'https://github\.com/[\w-]+/[\w.-]+(?:\.git)?',
-            r'git@github\.com:[\w-]+/[\w.-]+(?:\.git)?',
-            r'github\.com/[\w-]+/[\w.-]+'
-        ]
-        
-        is_valid_url = any(re.match(pattern, github_url) for pattern in github_patterns)
-        if not is_valid_url:
-            raise ValueError(f"无效的 GitHub URL: {github_url}")
-        
-        # 标准化 URL（如果没有协议前缀，添加 https://）
-        if not github_url.startswith(('https://', 'git@')):
-            github_url = f'https://{github_url}'
-        
-        # 确保 URL 以 .git 结尾（可选，但更规范）
-        if not github_url.endswith('.git') and github_url.startswith('https://'):
-            github_url = f'{github_url}.git'
-        
-        # 从 URL 中提取仓库名称
-        repo_name = github_url.rstrip('/').rstrip('.git').split('/')[-1]
-        
-        # 创建目标路径（如果不存在）
-        target_dir = Path(self.target_path).expanduser().resolve()
+        if repo_name.endswith(".git"):
+            repo_name = repo_name[:-4]
+        # 3. 拼接出最终的本地绝对路径
+        local_repo_path = os.path.abspath(os.path.join(self.target_path, repo_name))
+
+        # 4. 检查目录是否已经存在
+        if os.path.exists(local_repo_path) and os.listdir(local_repo_path):
+            print(f"提示: 目标路径 '{local_repo_path}' 已存在且不为空，跳过 Clone 操作。")
+            return local_repo_path
+
+        # 5. 执行 git clone 命令
         try:
-            target_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            raise RuntimeError(f"无法创建目标目录 {target_dir}: {str(e)}")
-        
-        # 完整的仓库本地路径
-        repo_local_path = target_dir / repo_name
-        
-        # 检查目标路径是否已存在
-        if repo_local_path.exists():
-            print(
-                f"目标路径已存在: {repo_local_path}。"
-                f"请删除该目录或选择其他路径。"
-            )
-            return str(repo_local_path.absolute())
-        
-        # 执行 git clone 命令
-        try:
-            print(f"正在克隆仓库: {github_url}")
-            print(f"目标路径: {repo_local_path}")
-            
-            result = subprocess.run(
-                ['git', 'clone', github_url, str(repo_local_path)],
-                capture_output=True,
-                text=True,
+            print(f"正在克隆仓库: {github_url} ...")
+            # subprocess.run 执行命令，check=True 表示如果命令失败则抛出异常
+            subprocess.run(
+                ["git", "clone", github_url, local_repo_path],
                 check=True,
-                timeout=300  # 5分钟超时
+                text=True,
+                capture_output=True # 捕获输出，避免把标准输出弄乱，如果需要看实时进度可以去掉这行
             )
-            
-            print(f"克隆成功！")
-            if result.stdout:
-                print(result.stdout)
-                
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("克隆操作超时（超过5分钟）")
+            print("克隆成功！")
+            return local_repo_path
+
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
-            raise RuntimeError(f"克隆失败: {error_msg}")
-        except FileNotFoundError:
-            raise RuntimeError(
-                "未找到 git 命令。请确保已安装 Git 并将其添加到系统 PATH 中。"
-            )
-        
-        # 返回绝对路径
-        return str(repo_local_path.absolute())
+            # 如果 clone 失败，输出错误信息
+            error_msg = f"Git clone 失败!\n返回码: {e.returncode}\n错误信息: {e.stderr.strip()}"
+            raise RuntimeError(error_msg)
 
 
 # 示例使用
@@ -103,8 +95,7 @@ if __name__ == "__main__":
     # 测试示例
     try:
         # 示例 1: 克隆一个公开仓库
-        repo_url = "https://github.com/old-kindhearter/AgnoCodingAgent"
-        target = "/srv/AgnoCodingAgent/Knowledge/vector_db/AgnoCodingAgent"
+        repo_url = "https://atomgit.com/mindspore/vllm-mindspore.git"
         
         local_path = search.clone_github_repo(repo_url)
         print(f"\n✅ 仓库已克隆到: {local_path}")
