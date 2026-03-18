@@ -12,7 +12,7 @@ class GitClone(Toolkit):
         self.target_path = '/srv/AgnoCodingAgent/Knowledge/codebase'  # 直接定死，不要给模型改。建议配置绝对路径。
 
 
-    def _convert_github_url(github_url):
+    def _convert_github_url(self, github_url):
         """
         将各种GitHub URL格式转换为HTTPS格式
         """

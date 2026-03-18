@@ -212,6 +212,8 @@ agent_os = AgentOS(
 )
 app = agent_os.get_app()
 
+# sudo systemctl restart fastapi-plugin.service
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Dict, Optional, Tuple
 import chromadb
 from agno.tools import Toolkit
-from embedder_factory import EmbedderSingleton
+from tools.embedder_factory import EmbedderSingleton
 
 # Suppress Jina model warnings
 import warnings
