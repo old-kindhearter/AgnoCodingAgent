@@ -31,6 +31,11 @@ os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
 
 team_db = SqliteDb(db_file=STORAGE_DB_PATH)
 
+STORAGE_DB_PATH = os.path.join(os.path.dirname(__file__), "tmp", "agno_agentos_sessions.db")
+os.makedirs(os.path.dirname(STORAGE_DB_PATH) or "tmp", exist_ok=True)
+
+team_db = SqliteDb(db_file=STORAGE_DB_PATH)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """

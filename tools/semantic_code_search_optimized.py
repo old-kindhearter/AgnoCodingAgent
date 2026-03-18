@@ -2,11 +2,9 @@ import os
 import time
 import numpy as np
 from typing import List, Dict, Optional, Tuple
-
 import chromadb
-from sentence_transformers import SentenceTransformer
 from agno.tools import Toolkit
-from tools.embedder_factory import EmbedderSingleton
+from embedder_factory import EmbedderSingleton
 
 # Suppress Jina model warnings
 import warnings
